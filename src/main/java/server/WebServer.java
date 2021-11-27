@@ -1,9 +1,6 @@
 package server;
 
-import entities.ConfigWorker;
-import entities.Message;
-import entities.Serializer;
-import entities.User;
+import entities.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,15 +25,14 @@ public class WebServer {
     public static final String SETTINGS_FILE_PATH = RESOURCES_PATH + SEP + "settings.txt";
     public static final String LOG_EXTENSION = ".log";
     public static final String ROOT_LOG_DIRECTORY = "logs";
-    public static final String CHAT_LOG_DIRECTORY = ROOT_LOG_DIRECTORY + SEP + "chat_log";
+    public static final String CHAT_LOG_PATH = ROOT_LOG_DIRECTORY + SEP + "serverChat.log";
     protected static final String SERVER_LOG_PATH = ROOT_LOG_DIRECTORY + SEP + "requests" + LOG_EXTENSION;
     private static final String HOST =
             ConfigWorker.getHostAndPortFromConfig(SETTINGS_FILE_PATH)[ConfigWorker.HOST_INDEX];
     private static final int PORT =
             Integer.parseInt(ConfigWorker.getHostAndPortFromConfig(SETTINGS_FILE_PATH)[ConfigWorker.PORT_INDEX]);
     public static final int MAX_ONLINE = 10;
-    protected static final String USERS_STORAGE_PATH = RESOURCES_PATH + SEP + "users.info";
-    private static final Map<String, User> users = new ConcurrentSkipListMap<>();
+    protected static final Map<String, User> users = new ConcurrentSkipListMap<>();
     protected static final AtomicInteger online = new AtomicInteger(0);
     protected static final List<Message> chatList = new CopyOnWriteArrayList<>();
     protected static final List<SocketChannel> clientList = new CopyOnWriteArrayList<>();
@@ -47,16 +43,15 @@ public class WebServer {
         try {
             final ServerSocketChannel server = ServerSocketChannel.open();
             server.bind(new InetSocketAddress(HOST, PORT));
-            if (Files.exists(Paths.get(USERS_STORAGE_PATH))) {
-                final List<String> savedUsers =
-                        Files.readAllLines(Paths.get(USERS_STORAGE_PATH), StandardCharsets.UTF_8);
-                for (String userJson : savedUsers) {
-                    if (!userJson.trim().isEmpty()) {
-                        final User user = Serializer.deserialize(userJson, User.class);
-                        users.put(user.getName(), user);
+            if (Files.exists(Paths.get(CHAT_LOG_PATH))) {
+                final List<String> messageList =
+                        Files.readAllLines(Paths.get(CHAT_LOG_PATH), StandardCharsets.UTF_8);
+                for (String messageJson : messageList) {
+                    if (!messageJson.trim().isEmpty()) {
+                        final Message message = Serializer.deserialize(messageJson, Message.class);
+                        chatList.add(message);
                     }
                 }
-
             }
 
             while (!Thread.currentThread().isInterrupted()) {
@@ -74,11 +69,10 @@ public class WebServer {
     }
 
     public static Map<String, User> getUsers() {
-        return users;
+        return new HashMap<>(users);
     }
 
-    public static void sendToAll(String text) {
-        System.out.println("sendToAll() call");
+    protected static void sendToAll(String text) {
         clientList.forEach((client) -> {
             try {
                 client.write(ByteBuffer.wrap(text.getBytes(StandardCharsets.UTF_8)));
@@ -88,7 +82,18 @@ public class WebServer {
         });
     }
 
-    public static List<Message> getChatList() {
-        return new ArrayList<>(chatList);
+    protected static void sendChatListTo(SocketChannel client) {
+        Request request;
+        String json;
+        for (Message message : chatList) {
+            try {
+                json = Serializer.serialize(message);
+                request = new Request(Commands.SEND_MESSAGE, json);
+                json = Serializer.serialize(request);
+                client.write(ByteBuffer.wrap(json.getBytes(StandardCharsets.UTF_8)));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

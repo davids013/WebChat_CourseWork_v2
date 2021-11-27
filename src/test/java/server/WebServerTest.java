@@ -13,20 +13,28 @@ import java.nio.charset.StandardCharsets;
 
 public class WebServerTest {
     @BeforeAll
-    static void start() { Methods.start(); }
+    static void start() {
+        Methods.start();
+    }
 
     @AfterAll
-    static void end() { Methods.end(); }
+    static void end() {
+        Methods.end();
+    }
 
     @BeforeEach
-    public void newTest() { Methods.newTest(); }
+    public void newTest() {
+        Methods.newTest();
+    }
 
     @AfterEach
-    public void endTest() { Methods.endTest(); }
+    public void endTest() {
+        Methods.endTest();
+    }
 
     @Test
     void startTest() throws IOException, InterruptedException {
-        boolean[] result = {false, false, false};
+        boolean result = false;
         String userName = "testUser";
         final Gson gson = new Gson();
         final String[] hostAndPort = ConfigWorker.getHostAndPortFromConfig(WebServer.SETTINGS_FILE_PATH);
@@ -46,47 +54,39 @@ public class WebServerTest {
             Request request = new Request(Commands.REGISTER_USER, userName);
             String requestStr = gson.toJson(request);
             socketChannel.write(ByteBuffer.wrap(requestStr.getBytes(StandardCharsets.UTF_8)));
-            int bytesCount = socketChannel.read(inputBuffer);
-            String input;
-            if (bytesCount >= 0) {
-                input = new String(inputBuffer.array(), 0, bytesCount, StandardCharsets.UTF_8).trim();
+            if (socketChannel.read(inputBuffer) >= 0) {
                 inputBuffer.clear();
-                if (input.startsWith("Успешно") && WebServer.getUsers().containsKey(userName)) {
-                    result[0] = true;
+                if (WebServer.getUsers().containsKey(userName)) {
+                    result = true;
                 }
             }
+            Assertions.assertTrue(result);
 
+            result = false;
             final Message message = new Message(userName, "testMessage");
             request = new Request(Commands.SEND_MESSAGE, gson.toJson(message));
             requestStr = Serializer.serialize(request);
             socketChannel.write(ByteBuffer.wrap(requestStr.getBytes(StandardCharsets.UTF_8)));
             Thread.sleep(500);
-            if (bytesCount >= 0) {
-                input = new String(inputBuffer.array(), 0, bytesCount, StandardCharsets.UTF_8).trim();
+            if (socketChannel.read(inputBuffer) >= 0) {
                 inputBuffer.clear();
-                if (input.startsWith("Успешно")
-                        && WebServer.getUsers().get(userName).getIncomingMessages().contains(message)
-                        && WebServer.getUsers().get(userName).getOutgoingMessages().contains(message)) {
-                    result[1] = true;
+                if (WebServer.getUsers().get(userName).getOutgoingMessages().contains(message)) {
+                    result = true;
                 }
             }
+            Assertions.assertTrue(result);
 
+            result = false;
             System.out.println("\t\tExit test");
             request = new Request(Commands.EXIT, "exit");
             final int online = WebServer.getOnline();
             requestStr = Serializer.serialize(request);
             socketChannel.write(ByteBuffer.wrap(requestStr.getBytes(StandardCharsets.UTF_8)));
-            Thread.sleep(100);                      // Пауза на удаление
+            Thread.sleep(100);          // Пауза на удаление пользователя сервером
             if (WebServer.getOnline() == online - 1) {
-                result[2] = true;
+                result = true;
             }
-
-            final String logFile = WebServer.getUsers().get(userName).getLogFile();
-            new File(logFile).delete();
-//            new File(WebServer.CHAT_LOG_DIRECTORY + WebServer.SEP
-//                    + userName + WebServer.LOG_EXTENSION).delete();
-
-            Assertions.assertTrue(result[0] && result[1] && result[2]);
+            Assertions.assertTrue(result);
         }
     }
 

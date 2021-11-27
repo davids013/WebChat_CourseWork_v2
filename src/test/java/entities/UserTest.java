@@ -4,7 +4,6 @@ import methods.Methods;
 import org.junit.jupiter.api.*;
 import org.mockito.Mockito;
 
-import java.io.File;
 import java.time.LocalDateTime;
 
 public class UserTest {
@@ -31,22 +30,7 @@ public class UserTest {
 
         final User user = new User(name);
         user.sendMessage(message);
-        new File(user.getLogFile()).delete();
 
         Assertions.assertTrue(user.getOutgoingMessages().contains(message));
-    }
-
-    @Test
-    void receiveMessageTest() {
-        final Message message = Mockito.mock(Message.class);
-        Mockito.when(message.getAuthor()).thenReturn("testAuthor");
-        Mockito.when(message.getText()).thenReturn("testText");
-        Mockito.when(message.getSentTime()).thenReturn(LocalDateTime.now());
-
-        final User user = new User(name);
-        user.receiveMessage(message);
-        new File(user.getLogFile()).delete();
-
-        Assertions.assertTrue(user.getIncomingMessages().contains(message));
     }
 }

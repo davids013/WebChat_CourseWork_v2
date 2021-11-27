@@ -6,8 +6,8 @@ import java.nio.file.Paths;
 
 public class FileLogger implements Logger {
     public static final String LINE_SEPARATOR = "\r\n";
-    private final File file;
-    private boolean isAppendable;
+    protected final File file;
+    protected boolean isAppendable;
 
     public FileLogger(String fileName, boolean isAppendable) {
         file = new File(fileName);
